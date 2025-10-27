@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Joyarz Space - Audio Visualizer</title>
+  <style>
+    @import url("https://fonts.cdnfonts.com/css/thegoodmonolith");
+
+    :root {
+      --bg-color: #0f0f0f;
+      --grid-color: rgba(255, 184, 0, 0.05);
+      --text-primary: #fff4d9;
+      --text-secondary: #c4a962;
+      --text-highlight: #ffb800;
+      --accent-primary: #ffb800;
+      --accent-secondary: #ff9500;
+      --accent-tertiary: #ffd966;
+      --accent-gold: #d4af37;
+      --panel-bg: rgba(20, 18, 10, 0.85);
+      --panel-border: rgba(255, 184, 0, 0.3);
+      --panel-highlight: rgba(255, 184, 0, 0.1);
+      --scanner-line: rgba(255, 184, 0, 0.7);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-primary);
+      font-family: "TheGoodMonolith", monospace;
+      overflow: hidden;
+      height: 100vh;
+      text-transform: uppercase;
+      font-size: 1rem;
+    }
+
+    button, input, select, textarea {
+      font-family: inherit;
+    }
+
+    .space-background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+        radial-gradient(circle at 20% 50%, rgba(255, 184, 0, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 50%, rgba(255, 149, 0, 0.12) 0%, transparent 50%),
+        radial-gradient(circle at 50% 80%, rgba(212, 175, 55, 0.1) 0%, transparent 50%),
+        linear-gradient(135deg, #0f0f0f 0%, #1a1504 50%, #0f0f0f 100%);
+      z-index: 0;
+      opacity: 0.9;
+      animation: subtleGlow 8s ease-in-out infinite alternate;
+    }
+
+    @keyframes subtleGlow {
+      0% {
+        filter: brightness(1) contrast(1);
+      }
+      50% {
+        filter: brightness(1.1) contrast(1.05);
+      }
+      100% {
+        filter: brightness(1) contrast(1);
+      }
+    }
+
+    #three-container {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      cursor: grab;
+    }
+
+    #three-container:active {
+      cursor: grabbing;
+    }
+
+    .interface-container {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      z-index: 2;
+      pointer-events: none;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .grid-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: 
+        linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      padding: 1.25rem;
+    }
+
+    .header-item {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .scanner-frame {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 400px;
+      height: 400px;
+      border: 1px solid var(--accent-primary);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+      box-shadow: 0 0 30px rgba(255, 184, 0, 0.2);
+    }
+
+    .scanner-frame .corner-tl,
+    .scanner-frame .corner-tr,
+    .scanner-frame .corner-bl,
+    .scanner-frame .corner-br {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+    }
+
+    .scanner-frame .corner-tl {
+      top: -1px;
+      left: -1px;
+      border-top: 2px solid var(--accent-primary);
+      border-left: 2px solid var(--accent-primary);
+    }
+
+    .scanner-frame .corner-tr {
+      top: -1px;
+      right: -1px;
+      border-top: 2px solid var(--accent-primary);
+      border-right: 2px solid var(--accent-primary);
+    }
+
+    .scanner-frame .corner-bl {
+      bottom: -1px;
+      left: -1px;
+      border-bottom: 2px solid var(--accent-primary);
+      border-left: 2px solid var(--accent-primary);
+    }
+
+    .scanner-frame .corner-br {
+      bottom: -1px;
+      right: -1px;
+      border-bottom: 2px solid var(--accent-primary);
+      border-right: 2px solid var(--accent-primary);
+    }
+
+    .scanner-id {
+      position: absolute;
+      bottom: -30px;
+      left: 0;
+      font-size: 0.75rem;
+      color: var(--accent-primary);
+    }
+
+    .scanner-id-right {
+      position: absolute;
+      bottom: -30px;
+      right: 0;
+      font-size: 0.75rem;
+      color: var(--accent-gold);
+    }
+
+    .data-panel {
+      width: 300px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 5px;
+      padding: 0.9375rem;
+      backdrop-filter: blur(8px);
+      pointer-events: auto;
+    }
+
+    .data-panel-title {
+      font-size: 0.875rem;
+      color: var(--accent-primary);
+      margin-bottom: 0.625rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .data-readouts {
+      margin-top: 0.625rem;
+    }
+
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.3125rem;
+      font-size: 0.75rem;
+    }
+
+    .data-label {
+      color: var(--text-secondary);
+    }
+
+    .data-value {
+      color: var(--text-primary);
+    }
+
+    .data-bar {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 0.625rem 0;
+      position: relative;
+      border-radius: 3px;
+    }
+
+    .data-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary));
+      border-radius: 3px;
+      transition: width 0.5s;
+      box-shadow: 0 0 10px rgba(255, 184, 0, 0.5);
+    }
+
+    .waveform {
+      width: 100%;
+      height: 50px;
+      margin: 0.625rem 0;
+      display: flex;
+      align-items: center;
+      position: relative;
+    }
+
+    .waveform-canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    .control-panel {
+      width: 320px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 5px;
+      padding: 0.9375rem;
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      backdrop-filter: blur(8px);
+      pointer-events: auto;
+      z-index: 10;
+    }
+
+    .control-group {
+      margin-bottom: 0.9375rem;
+    }
+
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+
+    .control-label {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .control-value {
+      font-size: 0.75rem;
+      color: var(--text-primary);
+    }
+
+    .slider-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      outline: none;
+      border-radius: 3px;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent-primary);
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(255, 184, 0, 0.5);
+    }
+
+    .buttons {
+      display: flex;
+      gap: 0.625rem;
+      margin-top: 0.9375rem;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 0.5rem 0;
+      background: var(--panel-highlight);
+      border: 1px solid var(--panel-border);
+      color: var(--accent-primary);
+      font-size: 0.75rem;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: var(--panel-border);
+      box-shadow: 0 0 15px rgba(255, 184, 0, 0.3);
+    }
+
+    .btn.active {
+      background: var(--accent-primary);
+      color: #0f0f0f;
+      font-weight: bold;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .terminal-panel {
+      position: absolute;
+      left: 20px;
+      bottom: 20px;
+      width: 500px;
+      height: 150px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 5px;
+      overflow: hidden;
+      pointer-events: auto;
+      z-index: 10;
+    }
+
+    .terminal-header {
+      padding: 0.5rem 0.625rem;
+      background: rgba(0, 0, 0, 0.3);
+      font-size: 0.875rem;
+      color: var(--accent-primary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-direction: row;
+      margin-bottom: 1rem;
+    }
+
+    .terminal-content {
+      padding: 0.625rem;
+      height: calc(100% - 31px);
+      overflow-y: auto;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .terminal-line {
+      margin-bottom: 0.3125rem;
+    }
+
+    .command-line {
+      color: var(--accent-tertiary);
+    }
+
+    .regular-line {
+      color: var(--text-highlight);
+    }
+
+    .typing::after {
+      content: "|";
+      position: absolute;
+      animation: blink 1s infinite;
+      color: var(--accent-primary);
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .notification {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      padding: 0.625rem 1.25rem;
+      border-radius: 5px;
+      font-size: 0.75rem;
+      color: var(--accent-primary);
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 100;
+      box-shadow: 0 0 20px rgba(255, 184, 0, 0.3);
+    }
+
+    .circular-visualizer {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 450px;
+      height: 450px;
+      pointer-events: none;
+      z-index: 5;
+      display: none;
+    }
+
+    .circular-visualizer canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    .audio-wave {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: transparent;
+      border: 1px solid rgba(255, 184, 0, 0.1);
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .audio-wave::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 184, 0, 0.05);
+      animation: pulse 4s infinite;
+    }
+
+    @keyframes pulse {
+      0% { width: 100%; height: 100%; opacity: 0.5; }
+      50% { width: 120%; height: 120%; opacity: 0; }
+      100% { width: 100%; height: 100%; opacity: 0.5; }
+    }
+
+    .spectrum-analyzer {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      width: 400px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 5px;
+      overflow: hidden;
+      pointer-events: auto;
+      z-index: 10;
+    }
+
+    .spectrum-header {
+      padding: 0.5rem 0.625rem;
+      background: rgba(0, 0, 0, 0.3);
+      font-size: 0.875rem;
+      color: var(--accent-primary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .spectrum-content {
+      padding: 0.625rem;
+      position: relative;
+    }
+
+    .spectrum-canvas {
+      width: 100%;
+      height: 120px;
+      display: block;
+    }
+
+    .audio-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
+      margin-top: 0.9375rem;
+      padding: 0 0.625rem 0.625rem;
+    }
+
+    .audio-mode-selector {
+      display: flex;
+      gap: 0.625rem;
+      margin-bottom: 0.625rem;
+    }
+
+    .mode-btn {
+      flex: 1;
+      padding: 0.5rem 0;
+      background: var(--panel-highlight);
+      border: 1px solid var(--panel-border);
+      color: var(--accent-primary);
+      font-size: 0.75rem;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mode-btn:hover {
+      background: var(--panel-border);
+    }
+
+    .mode-btn.active {
+      background: var(--accent-primary);
+      color: #0f0f0f;
+      font-weight: bold;
+    }
+
+    .audio-file-input {
+      display: none;
+    }
+
+    .audio-file-btn {
+      display: block;
+      padding: 0.5rem 0;
+      background: var(--panel-highlight);
+      border: 1px solid var(--panel-border);
+      color: var(--accent-primary);
+      font-size: 0.75rem;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      margin-bottom: 0.625rem;
+    }
+
+    .audio-file-btn:hover {
+      background: var(--panel-border);
+    }
+
+    .audio-file-label {
+      display: block;
+      padding: 0.5rem 0.625rem;
+      background: rgba(0, 0, 0, 0.2);
+      color: var(--accent-primary);
+      font-size: 0.75rem;
+      border-radius: 3px;
+      margin-bottom: 0.625rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .audio-player {
+      width: 100%;
+      margin-bottom: 0.625rem;
+    }
+
+    .controls-row {
+      display: flex;
+      gap: 0.625rem;
+      margin-bottom: 0.625rem;
+    }
+
+    .audio-sensitivity-label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.3125rem;
+      font-size: 0.75rem;
+    }
+
+    .audio-sensitivity-value {
+      color: var(--accent-primary);
+    }
+
+    .demo-tracks {
+      margin-top: 0.625rem;
+      margin-bottom: 0.9375rem;
+    }
+
+    .demo-tracks-label {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.3125rem;
+      display: block;
+    }
+
+    .demo-track-btn {
+      display: inline-block;
+      padding: 0.3125rem 0.625rem;
+      margin-right: 0.3125rem;
+      margin-bottom: 0.3125rem;
+      background: var(--panel-highlight);
+      border: 1px solid var(--panel-border);
+      color: var(--accent-primary);
+      font-size: 0.6875rem;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .demo-track-btn:hover {
+      background: var(--panel-border);
+    }
+
+    .demo-track-btn.active {
+      background: var(--accent-primary);
+      color: #0f0f0f;
+      font-weight: bold;
+    }
+
+    #status-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-primary);
+      display: inline-block;
+      box-shadow: 0 0 10px var(--accent-primary);
+      animation: pulse-indicator 2s infinite;
+    }
+
+    @keyframes pulse-indicator {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .floating-particles {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      transition: opacity 0.5s;
+    }
+
+    .loading-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      max-width: 500px;
+      padding: 1.25rem;
+    }
+
+    .preloader-canvas-container {
+      width: 180px;
+      height: 180px;
+      position: relative;
+    }
+
+    .preloader-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .loading-text {
+      margin-top: 1.25rem;
+      text-align: center;
+      color: var(--accent-primary);
+      letter-spacing: 2px;
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="space-background"></div>
+
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="loading-container">
+      <div class="preloader-canvas-container">
+        <canvas id="preloader-canvas" class="preloader-canvas" width="180" height="180"></canvas>
+      </div>
+      <div class="loading-text">INITIALIZING JOYARZ.SPACE</div>
+    </div>
+  </div>
+
+  <div class="notification" id="notification">System initialized</div>
+
+  <div id="three-container"></div>
+
+  <div class="grid-overlay"></div>
+
+  <div class="circular-visualizer">
+    <canvas id="circular-canvas"></canvas>
+  </div>
+
+  <div class="audio-wave" id="audio-wave"></div>
+
+  <div class="floating-particles" id="floating-particles"></div>
+
+  <div class="interface-container">
+    <div class="header">
+      <div class="header-item">JOYARZ.SPACE</div>
+      <div class="header-item">AUDIO VISUALIZER v2.0</div>
+      <div class="header-item" id="timestamp">TIME: 00:00:00</div>
+    </div>
+
+    <div class="scanner-frame">
+      <div class="corner-tl"></div>
+      <div class="corner-tr"></div>
+      <div class="corner-bl"></div>
+      <div class="corner-br"></div>
+      <div class="scanner-id">SYSTEM.INIT(JOYARZ.SPACE)</div>
+      <div class="scanner-id-right">AUDIO.REACTIVE.V2</div>
+    </div>
+  </div>
+
+  <div class="data-panel" style="position: absolute; top: 20px; left: 20px;">
+    <div class="data-panel-title">
+      <span>AUDIO METRICS</span>
+      <span id="status-indicator"></span>
+    </div>
+    <div class="data-bar">
+      <div class="data-bar-fill" id="stability-bar" style="width: 75%;"></div>
+    </div>
+    <div class="data-readouts">
+      <div class="data-row">
+        <span class="data-label">SIGNAL STRENGTH:</span>
+        <span class="data-value" id="stability-value">75%</span>
+      </div>
+      <div class="data-row">
+        <span class="data-label">BASS LEVEL:</span>
+        <span class="data-value" id="mass-value">1.728</span>
+      </div>
+      <div class="data-row">
+        <span class="data-label">ENERGY OUTPUT:</span>
+        <span class="data-value" id="energy-value">5.3e8 J</span>
+      </div>
+      <div class="data-row">
+        <span class="data-label">HARMONIC RATIO:</span>
+        <span class="data-value" id="variance-value">0.0042</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="data-panel" style="position: absolute; top: 20px; right: 20px;">
+    <div class="data-panel-title">FREQUENCY ANALYSIS</div>
+    <div class="waveform">
+      <canvas id="waveform-canvas" class="waveform-canvas"></canvas>
+    </div>
+    <div class="data-readouts">
+      <div class="data-row">
+        <span class="data-label">PEAK FREQUENCY:</span>
+        <span class="data-value" id="peak-value">127.3 HZ</span>
+      </div>
+      <div class="data-row">
+        <span class="data-label">AMPLITUDE:</span>
+        <span class="data-value" id="amplitude-value">0.56</span>
+      </div>
+      <div class="data-row">
+        <span class="data-label">PHASE:</span>
+        <span class="data-value" id="phase-value">π/4</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="control-panel" style="top: 50%; left: 20px; transform: translateY(-50%);">
+    <div class="panel-header">
+      <span class="data-panel-title">VISUALIZATION CONTROLS</span>
+    </div>
+    
+    <div class="control-group">
+      <div class="control-row">
+        <span class="control-label">ROTATION SPEED</span>
+        <span class="control-value" id="rotation-value">1.0</span>
+      </div>
+      <div class="slider-container">
+        <input type="range" min="0" max="5" value="1" step="0.1" class="slider" id="rotation-slider">
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-row">
+        <span class="control-label">RESOLUTION</span>
+        <span class="control-value" id="resolution-value">32</span>
+      </div>
+      <div class="slider-container">
+        <input type="range" min="12" max="64" value="32" step="4" class="slider" id="resolution-slider">
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-row">
+        <span class="control-label">DISTORTION</span>
+        <span class="control-value" id="distortion-value">1.0</span>
+      </div>
+      <div class="slider-container">
+        <input type="range" min="0" max="3" value="1" step="0.1" class="slider" id="distortion-slider">
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-row">
+        <span class="control-label">AUDIO REACTIVITY</span>
+        <span class="control-value" id="reactivity-value">1.0</span>
+      </div>
+      <div class="slider-container">
+        <input type="range" min="0" max="2" value="1" step="0.1" class="slider" id="reactivity-slider">
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="btn" id="reset-btn">RESET</button>
+    </div>
+  </div>
+
+  <div class="terminal-panel">
+    <div class="terminal-header">
+      <span>SYSTEM TERMINAL</span>
+      <span id="terminal-status">ONLINE</span>
+    </div>
+    <div class="terminal-content" id="terminal-content">
+      <div class="terminal-line">JOYARZ.SPACE v2.0 INITIALIZED. CONNECTION ESTABLISHED.</div>
+      <div class="terminal-line command-line">system.init({mode: 'audio_visualizer', reactive: true});</div>
+      <div class="terminal-line regular-line">Loading Three.js rendering engine...</div>
+      <div class="terminal-line typing"></div>
+    </div>
+  </div>
+
+  <div class="spectrum-analyzer">
+    <div class="spectrum-header">
+      <span>AUDIO SPECTRUM</span>
+    </div>
+    <div class="spectrum-content">
+      <canvas id="spectrum-canvas" class="spectrum-canvas"></canvas>
+    </div>
+    <div class="audio-controls">
+      <!-- Audio Mode Selector -->
+      <div class="audio-mode-selector">
+        <button class="mode-btn active" id="file-mode-btn">FILE MODE</button>
+        <button class="mode-btn" id="system-audio-btn">SYSTEM AUDIO</button>
+      </div>
+
+      <!-- File Mode Controls -->
+      <div id="file-mode-controls">
+        <div class="demo-tracks">
+          <span class="demo-tracks-label">DEMO TRACKS:</span>
+          <button class="demo-track-btn" data-url="https://assets.codepen.io/7558/Merkaba.mp3">MERKABA</button>
+          <button class="demo-track-btn" data-url="https://assets.codepen.io/7558/Dhamika.mp3">DHAMIKA</button>
+          <button class="demo-track-btn" data-url="https://assets.codepen.io/7558/Vacant.mp3">VACANT</button>
+          <button class="demo-track-btn" data-url="https://assets.codepen.io/7558/lxstnght-back_1.mp3">LXSTNGHT</button>
+        </div>
+
+        <input type="file" id="audio-file-input" class="audio-file-input" accept="audio/*">
+        <button class="audio-file-btn" id="file-btn">UPLOAD AUDIO FILE</button>
+        <div class="audio-file-label" id="file-label">NO FILE SELECTED</div>
+
+        <audio id="audio-player" class="audio-player" controls crossorigin="anonymous"></audio>
+      </div>
+
+      <!-- System Audio Mode Controls -->
+      <div id="system-audio-controls" style="display: none;">
+        <div class="audio-file-label" style="margin-bottom: 0.9375rem;">
+          ⚠️ NOTE: SYSTEM AUDIO CAPTURE REQUIRES BROWSER EXTENSION OR SCREEN SHARING
+        </div>
+        <button class="btn" id="start-system-audio-btn">CAPTURE SYSTEM AUDIO</button>
+        <div class="audio-file-label" id="system-audio-status">SYSTEM AUDIO INACTIVE</div>
+      </div>
+
+      <div class="controls-row">
+        <div class="audio-sensitivity" style="flex: 1;">
+          <div class="audio-sensitivity-label">
+            <span>SENSITIVITY</span>
+            <span class="audio-sensitivity-value" id="sensitivity-value">5.0</span>
+          </div>
+          <input type="range" min="1" max="10" value="5" step="0.1" class="slider" id="sensitivity-slider">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/Draggable.min.js"></script>
+  <script>
+    (function() {
+
+    // Global variables
+    let audioContext = null;
+    let audioAnalyser = null;
+    let audioSource = null;
+    let audioData;
+    let frequencyData;
+    let audioReactivity = 1.0;
+    let audioSensitivity = 5.0;
+    let isAudioInitialized = false;
+    let isAudioPlaying = false;
+    let currentAudioMode = 'file'; // 'file' or 'system'
+    let systemAudioStream = null;
+    
+    let scene, camera, renderer, controls;
+    let anomalyObject;
+    let distortionAmount = 1.0;
+    let resolution = 32;
+    let clock = new THREE.Clock();
+    let updateGlow, updateParticles;
+
+    // Initialize preloader
+    function setupExpandingCirclesPreloader() {
+      const canvas = document.getElementById('preloader-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      let time = 0;
+      let lastTime = 0;
+      const maxRadius = 80;
+      const circleCount = 5;
+      const dotCount = 24;
+
+      function animate(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        const deltaTime = timestamp - lastTime;
+        lastTime = timestamp;
+        time += deltaTime * 0.001;
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 184, 0, 0.9)';
+        ctx.fill();
+        
+        for (let c = 0; c < circleCount; c++) {
+          const circlePhase = (time * 0.3 + c / circleCount) % 1;
+          const radius = circlePhase * maxRadius;
+          const opacity = 1 - circlePhase;
+          
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(255, 184, 0, ${opacity * 0.2})`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          
+          for (let i = 0; i < dotCount; i++) {
+            const angle = (i / dotCount) * Math.PI * 2;
+            const x = centerX + Math.cos(angle) * radius;
+            const y = centerY + Math.sin(angle) * radius;
+            const size = 2 * (1 - circlePhase * 0.5);
+            
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 184, 0, ${opacity * 0.9})`;
+            ctx.fill();
+          }
+        }
+        
+        if (document.getElementById('loading-overlay').style.display !== 'none') {
+          requestAnimationFrame(animate);
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+
+    // Audio initialization
+    function initAudio() {
+      if (isAudioInitialized) return true;
+      try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        audioAnalyser = audioContext.createAnalyser();
+        audioAnalyser.fftSize = 2048;
+        audioAnalyser.smoothingTimeConstant = 0.8;
+        audioData = new Uint8Array(audioAnalyser.frequencyBinCount);
+        frequencyData = new Uint8Array(audioAnalyser.frequencyBinCount);
+        // DO NOT connect to destination - this prevents audio feedback
+        isAudioInitialized = true;
+        addTerminalMessage('AUDIO ANALYSIS SYSTEM INITIALIZED.');
+        showNotification('AUDIO SYSTEM ONLINE');
+        return true;
+      } catch (error) {
+        console.error('Audio initialization error:', error);
+        addTerminalMessage('ERROR: AUDIO SYSTEM INITIALIZATION FAILED.');
+        showNotification('AUDIO SYSTEM ERROR');
+        return false;
+      }
+    }
+
+    // System audio capture
+    async function captureSystemAudio() {
+      try {
+        if (!isAudioInitialized) {
+          if (!initAudio()) return;
+        }
+
+        addTerminalMessage('REQUESTING SYSTEM AUDIO ACCESS...');
+        showNotification('REQUESTING SYSTEM AUDIO ACCESS');
+
+        // Request screen capture with audio
+        systemAudioStream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+          }
+        });
+
+        // Clean up existing source
+        if (audioSource) {
+          audioSource.disconnect();
+        }
+
+        // Create media stream source
+        audioSource = audioContext.createMediaStreamSource(systemAudioStream);
+        audioSource.connect(audioAnalyser);
+
+        isAudioPlaying = true;
+        document.getElementById('system-audio-status').textContent = 'SYSTEM AUDIO ACTIVE';
+        document.getElementById('start-system-audio-btn').textContent = 'STOP SYSTEM AUDIO';
+        document.getElementById('start-system-audio-btn').classList.add('active');
+        
+        addTerminalMessage('SYSTEM AUDIO CAPTURE ACTIVE.');
+        showNotification('SYSTEM AUDIO ACTIVE');
+
+        // Handle stream end
+        systemAudioStream.getVideoTracks()[0].addEventListener('ended', () => {
+          stopSystemAudio();
+        });
+
+      } catch (error) {
+        console.error('System audio capture error:', error);
+        addTerminalMessage('ERROR: SYSTEM AUDIO CAPTURE FAILED. ' + error.message);
+        showNotification('SYSTEM AUDIO CAPTURE FAILED');
+      }
+    }
+
+    function stopSystemAudio() {
+      if (systemAudioStream) {
+        systemAudioStream.getTracks().forEach(track => track.stop());
+        systemAudioStream = null;
+      }
+      if (audioSource) {
+        audioSource.disconnect();
+        audioSource = null;
+      }
+      isAudioPlaying = false;
+      document.getElementById('system-audio-status').textContent = 'SYSTEM AUDIO INACTIVE';
+      document.getElementById('start-system-audio-btn').textContent = 'CAPTURE SYSTEM AUDIO';
+      document.getElementById('start-system-audio-btn').classList.remove('active');
+      addTerminalMessage('SYSTEM AUDIO CAPTURE STOPPED.');
+      showNotification('SYSTEM AUDIO STOPPED');
+    }
+
+    // Load audio file
+    function loadAudioFile(file) {
+      try {
+        if (!isAudioInitialized && !initAudio()) return;
+
+        const audioPlayer = document.getElementById('audio-player');
+        const fileURL = URL.createObjectURL(file);
+        audioPlayer.src = fileURL;
+
+        audioPlayer.onloadeddata = function() {
+          if (audioSource) audioSource.disconnect();
+          audioSource = audioContext.createMediaElementSource(audioPlayer);
+          audioSource.connect(audioAnalyser);
+          
+          audioPlayer.play().then(() => {
+            isAudioPlaying = true;
+          }).catch(e => {
+            console.warn('Auto-play prevented:', e);
+            addTerminalMessage('WARNING: CLICK PLAY TO START AUDIO.');
+          });
+        };
+
+        document.getElementById('file-label').textContent = file.name;
+        addTerminalMessage(`AUDIO FILE LOADED: ${file.name}`);
+        showNotification('AUDIO FILE LOADED');
+      } catch (error) {
+        console.error('Audio file error:', error);
+        addTerminalMessage('ERROR: AUDIO FILE PROCESSING FAILED.');
+        showNotification('AUDIO FILE ERROR');
+      }
+    }
+
+    // Load audio from URL
+    function loadAudioFromURL(url) {
+      try {
+        if (!isAudioInitialized && !initAudio()) return;
+
+        const audioPlayer = document.getElementById('audio-player');
+        audioPlayer.src = url;
+
+        audioPlayer.onloadeddata = function() {
+          if (audioSource) audioSource.disconnect();
+          audioSource = audioContext.createMediaElementSource(audioPlayer);
+          audioSource.connect(audioAnalyser);
+          
+          audioPlayer.play().then(() => {
+            isAudioPlaying = true;
+            addTerminalMessage(`PLAYING: ${url.split('/').pop()}`);
+            showNotification(`PLAYING: ${url.split('/').pop()}`);
+          }).catch(e => {
+            console.warn('Play prevented:', e);
+            addTerminalMessage('WARNING: CLICK PLAY TO START AUDIO.');
+          });
+        };
+
+        const filename = url.split('/').pop();
+        document.getElementById('file-label').textContent = filename;
+        addTerminalMessage(`LOADING: ${url.substring(0, 40)}...`);
+      } catch (error) {
+        console.error('Audio URL error:', error);
+        addTerminalMessage('ERROR: AUDIO URL PROCESSING FAILED.');
+      }
+    }
+
+    // Visualizers
+    function drawCircularVisualizer() {
+      if (!audioAnalyser) return;
+      const canvas = document.getElementById('circular-canvas');
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      const centerX = width / 2;
+      const centerY = height / 2;
+      
+      ctx.clearRect(0, 0, width, height);
+      audioAnalyser.getByteFrequencyData(frequencyData);
+      
+      const numPoints = 180;
+      const baseRadius = Math.min(width, height) * 0.4;
+      const numRings = 3;
+      
+      for (let ring = 0; ring < numRings; ring++) {
+        const ringRadius = baseRadius * (0.7 + ring * 0.15);
+        const opacity = 0.8 - ring * 0.2;
+        
+        ctx.beginPath();
+        for (let i = 0; i < numPoints; i++) {
+          const freqIndex = Math.floor((i / numPoints) * frequencyData.length);
+          const value = frequencyData[freqIndex] / 255;
+          const adjustedValue = value * (audioSensitivity / 5) * audioReactivity;
+          const dynamicRadius = ringRadius * (1 + adjustedValue * 0.5);
+          
+          const angle = (i / numPoints) * Math.PI * 2;
+          const x = centerX + Math.cos(angle) * dynamicRadius;
+          const y = centerY + Math.sin(angle) * dynamicRadius;
+          
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+        ctx.closePath();
+        
+        const gradient = ctx.createRadialGradient(centerX, centerY, ringRadius * 0.8, centerX, centerY, ringRadius * 1.2);
+        gradient.addColorStop(0, `rgba(255, 184, 0, ${opacity})`);
+        gradient.addColorStop(1, `rgba(255, 149, 0, ${opacity * 0.7})`);
+        
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 2 + (numRings - ring);
+        ctx.stroke();
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = 'rgba(255, 184, 0, 0.7)';
+      }
+      ctx.shadowBlur = 0;
+    }
+
+    function drawSpectrumAnalyzer() {
+      if (!audioAnalyser) return;
+      const canvas = document.getElementById('spectrum-canvas');
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      
+      ctx.clearRect(0, 0, width, height);
+      audioAnalyser.getByteFrequencyData(frequencyData);
+      
+      const barWidth = width / 256;
+      let x = 0;
+      
+      for (let i = 0; i < 256; i++) {
+        const barHeight = (frequencyData[i] / 255) * height * (audioSensitivity / 5);
+        const hue = 45 - (i / 256) * 15; // Yellow to orange gradient
+        ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+        ctx.fillRect(x, height - barHeight, barWidth - 1, barHeight);
+        x += barWidth;
+      }
+    }
+
+    function drawWaveform() {
+      const canvas = document.getElementById('waveform-canvas');
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+      ctx.fillRect(0, 0, width, height);
+      
+      if (audioAnalyser) {
+        audioAnalyser.getByteTimeDomainData(audioData);
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255, 184, 0, 0.8)';
+        ctx.lineWidth = 2;
+        
+        const sliceWidth = width / audioData.length;
+        let x = 0;
+        
+        for (let i = 0; i < audioData.length; i++) {
+          const v = audioData[i] / 128.0;
+          const y = (v * height) / 2;
+          
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+          x += sliceWidth;
+        }
+        ctx.stroke();
+      }
+      
+      requestAnimationFrame(drawWaveform);
+    }
+
+    // Three.js setup
+    function initThreeJS() {
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x0f0f0f, 0.05);
+      
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 0, 10);
+      
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000, 0);
+      document.getElementById('three-container').appendChild(renderer.domElement);
+      
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.1;
+      
+      const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
+      scene.add(ambientLight);
+      
+      const pointLight1 = new THREE.PointLight(0xffb800, 1, 10);
+      pointLight1.position.set(2, 2, 2);
+      scene.add(pointLight1);
+      
+      createAnomalyObject();
+      
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+      
+      animate();
+    }
+
+    function createAnomalyObject() {
+      if (anomalyObject) scene.remove(anomalyObject);
+      
+      anomalyObject = new THREE.Group();
+      const radius = 2;
+      const geometry = new THREE.IcosahedronGeometry(radius, Math.max(1, Math.floor(resolution / 8)));
+      
+      const material = new THREE.ShaderMaterial({
+        uniforms: {
+          time: { value: 0 },
+          color: { value: new THREE.Color(0xffb800) },
+          audioLevel: { value: 0 },
+          distortion: { value: distortionAmount }
+        },
+        vertexShader: `
+          uniform float time;
+          uniform float audioLevel;
+          uniform float distortion;
+          varying vec3 vNormal;
+          varying vec3 vPosition;
+          
+          void main() {
+            vNormal = normalize(normalMatrix * normal);
+            vec3 pos = position;
+            float noise = sin(pos.x * 2.0 + time) * cos(pos.y * 2.0 + time) * sin(pos.z * 2.0 + time);
+            pos += normal * noise * 0.2 * distortion * (1.0 + audioLevel);
+            vPosition = pos;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform float time;
+          uniform vec3 color;
+          uniform float audioLevel;
+          varying vec3 vNormal;
+          varying vec3 vPosition;
+          
+          void main() {
+            vec3 viewDirection = normalize(cameraPosition - vPosition);
+            float fresnel = 1.0 - max(0.0, dot(viewDirection, vNormal));
+            fresnel = pow(fresnel, 2.0 + audioLevel * 2.0);
+            
+            float pulse = 0.8 + 0.2 * sin(time * 2.0);
+            vec3 finalColor = color * fresnel * pulse * (1.0 + audioLevel * 0.8);
+            float alpha = fresnel * (0.7 - audioLevel * 0.3);
+            
+            gl_FragColor = vec4(finalColor, alpha);
+          }
+        `,
+        wireframe: true,
+        transparent: true
+      });
+      
+      const mesh = new THREE.Mesh(geometry, material);
+      anomalyObject.add(mesh);
+      scene.add(anomalyObject);
+      
+      return function updateAnomaly(time, audioLevel) {
+        material.uniforms.time.value = time;
+        material.uniforms.audioLevel.value = audioLevel;
+        material.uniforms.distortion.value = distortionAmount;
+      };
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      
+      const time = clock.getElapsedTime();
+      let audioLevel = 0;
+      
+      if (audioAnalyser && isAudioPlaying) {
+        audioAnalyser.getByteFrequencyData(frequencyData);
+        let sum = 0;
+        for (let i = 0; i < frequencyData.length; i++) {
+          sum += frequencyData[i];
+        }
+        audioLevel = ((sum / frequencyData.length / 255) * audioSensitivity) / 5;
+        
+        drawCircularVisualizer();
+        drawSpectrumAnalyzer();
+      }
+      
+      if (updateGlow) {
+        updateGlow(time, audioLevel);
+      }
+      
+      const rotationSpeed = parseFloat(document.getElementById('rotation-slider').value);
+      if (anomalyObject) {
+        const audioRotationFactor = 1 + audioLevel * audioReactivity;
+        anomalyObject.rotation.y += 0.005 * rotationSpeed * audioRotationFactor;
+        anomalyObject.rotation.z += 0.002 * rotationSpeed * audioRotationFactor;
+      }
+      
+      renderer.render(scene, camera);
+    }
+
+    // Utility functions
+    function showNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.style.opacity = 1;
+      setTimeout(() => {
+        notification.style.opacity = 0;
+      }, 3000);
+    }
+
+    function addTerminalMessage(message, isCommand = false) {
+      const terminalContent = document.getElementById('terminal-content');
+      const typingLine = terminalContent.querySelector('.typing');
+      const newLine = document.createElement('div');
+      newLine.className = isCommand ? 'terminal-line command-line' : 'terminal-line';
+      newLine.textContent = message;
+      terminalContent.insertBefore(newLine, typingLine);
+      terminalContent.scrollTop = terminalContent.scrollHeight;
+    }
+
+    function updateTimestamp() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById('timestamp').textContent = `TIME: ${hours}:${minutes}:${seconds}`;
+    }
+
+    // Initialize
+    setupExpandingCirclesPreloader();
+    
+    setTimeout(() => {
+      document.getElementById('loading-overlay').style.opacity = 0;
+      setTimeout(() => {
+        document.getElementById('loading-overlay').style.display = 'none';
+        initThreeJS();
+        updateGlow = createAnomalyObject();
+        drawWaveform();
+        setInterval(updateTimestamp, 1000);
+        updateTimestamp();
+        
+        // Initialize audio on first user interaction
+        let audioInitialized = false;
+        const initAudioOnce = () => {
+          if (!audioInitialized) {
+            audioInitialized = true;
+            if (!isAudioInitialized) initAudio();
+            if (audioContext && audioContext.state === 'suspended') {
+              audioContext.resume();
+            }
+            document.removeEventListener('click', initAudioOnce);
+          }
+        };
+        document.addEventListener('click', initAudioOnce);
+      }, 500);
+    }, 3000);
+
+    // Event listeners
+    document.getElementById('file-mode-btn').addEventListener('click', () => {
+      currentAudioMode = 'file';
+      document.getElementById('file-mode-btn').classList.add('active');
+      document.getElementById('system-audio-btn').classList.remove('active');
+      document.getElementById('file-mode-controls').style.display = 'block';
+      document.getElementById('system-audio-controls').style.display = 'none';
+      if (systemAudioStream) stopSystemAudio();
+      addTerminalMessage('SWITCHED TO FILE MODE');
+    });
+
+    document.getElementById('system-audio-btn').addEventListener('click', () => {
+      currentAudioMode = 'system';
+      document.getElementById('system-audio-btn').classList.add('active');
+      document.getElementById('file-mode-btn').classList.remove('active');
+      document.getElementById('system-audio-controls').style.display = 'block';
+      document.getElementById('file-mode-controls').style.display = 'none';
+      const audioPlayer = document.getElementById('audio-player');
+      if (audioPlayer.src) audioPlayer.pause();
+      addTerminalMessage('SWITCHED TO SYSTEM AUDIO MODE');
+    });
+
+    document.getElementById('start-system-audio-btn').addEventListener('click', () => {
+      if (systemAudioStream) {
+        stopSystemAudio();
+      } else {
+        captureSystemAudio();
+      }
+    });
+
+    document.querySelectorAll('.demo-track-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        if (!isAudioInitialized) initAudio();
+        const url = this.dataset.url;
+        document.querySelectorAll('.demo-track-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        loadAudioFromURL(url);
+      });
+    });
+
+    document.getElementById('file-btn').addEventListener('click', () => {
+      if (!isAudioInitialized) initAudio();
+      document.getElementById('audio-file-input').click();
+    });
+
+    document.getElementById('audio-file-input').addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        loadAudioFile(e.target.files[0]);
+      }
+    });
+
+    document.getElementById('rotation-slider').addEventListener('input', function() {
+      document.getElementById('rotation-value').textContent = this.value;
+    });
+
+    document.getElementById('resolution-slider').addEventListener('input', function() {
+      const value = parseInt(this.value);
+      document.getElementById('resolution-value').textContent = value;
+      resolution = value;
+      updateGlow = createAnomalyObject();
+    });
+
+    document.getElementById('distortion-slider').addEventListener('input', function() {
+      const value = parseFloat(this.value);
+      document.getElementById('distortion-value').textContent = value.toFixed(1);
+      distortionAmount = value;
+    });
+
+    document.getElementById('reactivity-slider').addEventListener('input', function() {
+      audioReactivity = parseFloat(this.value);
+      document.getElementById('reactivity-value').textContent = audioReactivity.toFixed(1);
+    });
+
+    document.getElementById('sensitivity-slider').addEventListener('input', function() {
+      audioSensitivity = parseFloat(this.value);
+      document.getElementById('sensitivity-value').textContent = audioSensitivity.toString();
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      document.getElementById('rotation-slider').value = 1.0;
+      document.getElementById('rotation-value').textContent = '1.0';
+      document.getElementById('resolution-slider').value = 32;
+      document.getElementById('resolution-value').textContent = '32';
+      document.getElementById('distortion-slider').value = 1.0;
+      document.getElementById('distortion-value').textContent = '1.0';
+      document.getElementById('reactivity-slider').value = 1.0;
+      document.getElementById('reactivity-value').textContent = '1.0';
+      audioReactivity = 1.0;
+      document.getElementById('sensitivity-slider').value = 5.0;
+      document.getElementById('sensitivity-value').textContent = '5.0';
+      audioSensitivity = 5.0;
+      distortionAmount = 1.0;
+      resolution = 32;
+      updateGlow = createAnomalyObject();
+      showNotification('SETTINGS RESET TO DEFAULT');
+    });
+  })();
+  </script>
+</body>
+</html>
